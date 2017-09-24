@@ -43,7 +43,9 @@ def bark2hz(bark):
 
 
 def hz2hz(hz):
-    "Dummy converter"
+    """
+    Dummy converter
+    """
     return hz
 
 
@@ -60,6 +62,31 @@ def greenwood(fmin, fmax, k=0.88):
     from_hz = lambda hz: 1/a * numpy.log10(k + hz / float(A))
     to_hz = lambda gw: float(A) * (10 ** (gw * a) - k)
     return from_hz, to_hz
+
+
+def xfc(scaling, signal, samplerate=16000, winlen=0.025, winstep=0.01, nfilt=26, nfft=512, lowfreq=0,
+         highfreq=None, preemph=0.97, winfunc=lambda x: numpy.ones((x,)), log=True):
+    """
+    Calculate x-scale frequency coefficients (no cepstral).
+    :param log: Whether to convert the result to logarithmic scale or not
+    :param scaling: a pair of conversion function to convert Hz to and from another scale, such as Mel, Bark,...
+    :param signal: the audio signal from which to compute features. Should be an N*1 array
+    :param samplerate: the samplerate of the signal we are working with.
+    :param winlen: the length of the analysis window in seconds. Default is 0.025s (25 milliseconds)
+    :param winstep: the step between successive windows in seconds. Default is 0.01s (10 milliseconds)
+    :param nfilt: the number of filters in the filterbank, default 26.
+    :param nfft: the FFT size. Default is 512.
+    :param lowfreq: lowest band edge of mel filters. In Hz, default is 0.
+    :param highfreq: highest band edge of mel filters. In Hz, default is samplerate/2
+    :param preemph: apply preemphasis filter with preemph as coefficient. 0 is no filter. Default is 0.97.
+    :param winfunc: the analysis window to apply to each frame. By default no window is applied. You can use numpy
+                    window functions here e.g. winfunc=numpy.hamming
+    :return: the xfc vector
+    """
+    feat, energy = fbank(signal, samplerate, winlen, winstep, nfilt, nfft, lowfreq, highfreq, preemph, winfunc, scaling)
+    if log:
+        feat = numpy.log(feat)
+    return feat
 
 
 def xfcc(scaling, signal, samplerate=16000, winlen=0.025, winstep=0.01, numcep=13, nfilt=26, nfft=512, lowfreq=0,
@@ -119,7 +146,7 @@ def mfcc(signal, samplerate=16000, winlen=0.025, winstep=0.01, numcep=13, nfilt=
 
 def lfcc(signal, samplerate=16000, winlen=0.025, winstep=0.01, numcep=13, nfilt=26, nfft=512, lowfreq=0, highfreq=None,
          preemph=0.97, ceplifter=22, appendEnergy=True, winfunc=lambda x: numpy.ones((x,))):
-    """Compute MFCC features from an audio signal.
+    """Compute linear frequency coefficients features from an audio signal.
 
     :param signal: the audio signal from which to compute features. Should be an N*1 array
     :param samplerate: the samplerate of the signal we are working with.
@@ -196,6 +223,102 @@ def gfcc(lowhear, hihear, signal, k=0.88, samplerate=16000, winlen=0.025, winste
     scaling = greenwood(lowhear, hihear, k)
     return xfcc(scaling, signal, samplerate, winlen, winstep, numcep, nfilt, nfft, lowfreq, highfreq, preemph,
                 ceplifter, appendEnergy, winfunc)
+
+
+def mfc(signal, samplerate=16000, winlen=0.025, winstep=0.01, nfilt=26, nfft=512, lowfreq=0, highfreq=None,
+         preemph=0.97, winfunc=lambda x: numpy.ones((x,)), log=True):
+    """Compute MFC features from an audio signal.
+
+    :param signal: the audio signal from which to compute features. Should be an N*1 array
+    :param samplerate: the samplerate of the signal we are working with.
+    :param winlen: the length of the analysis window in seconds. Default is 0.025s (25 milliseconds)
+    :param winstep: the step between successive windows in seconds. Default is 0.01s (10 milliseconds)
+    :param nfilt: the number of filters in the filterbank, default 26.
+    :param nfft: the FFT size. Default is 512.
+    :param lowfreq: lowest band edge of mel filters. In Hz, default is 0.
+    :param highfreq: highest band edge of mel filters. In Hz, default is samplerate/2
+    :param preemph: apply preemphasis filter with preemph as coefficient. 0 is no filter. Default is 0.97.
+                        energy.
+    :param winfunc: the analysis window to apply to each frame. By default no window is applied. You can use numpy
+                    window functions here e.g. winfunc=numpy.hamming
+    :param log: Whether to convert the result to logarithmic scale or not
+    :returns: A numpy array of size (NUMFRAMES by numcep) containing features. Each row holds 1 feature vector.
+    """
+    return xfc((hz2mel, mel2hz), signal, samplerate, winlen, winstep, nfilt, nfft, lowfreq, highfreq, preemph,
+                winfunc, log)
+
+
+def lfc(signal, samplerate=16000, winlen=0.025, winstep=0.01, nfilt=26, nfft=512, lowfreq=0, highfreq=None,
+         preemph=0.97, winfunc=lambda x: numpy.ones((x,)), log=True):
+    """Compute linear frequency coefficients feature from an audio signal.
+
+    :param signal: the audio signal from which to compute features. Should be an N*1 array
+    :param samplerate: the samplerate of the signal we are working with.
+    :param winlen: the length of the analysis window in seconds. Default is 0.025s (25 milliseconds)
+    :param winstep: the step between successive windows in seconds. Default is 0.01s (10 milliseconds)
+    :param nfilt: the number of filters in the filterbank, default 26.
+    :param nfft: the FFT size. Default is 512.
+    :param lowfreq: lowest band edge of mel filters. In Hz, default is 0.
+    :param highfreq: highest band edge of mel filters. In Hz, default is samplerate/2
+    :param preemph: apply preemphasis filter with preemph as coefficient. 0 is no filter. Default is 0.97.
+                        energy.
+    :param winfunc: the analysis window to apply to each frame. By default no window is applied. You can use numpy
+                    window functions here e.g. winfunc=numpy.hamming
+    :param log: Whether to convert the result to logarithmic scale or not
+    :returns: A numpy array of size (NUMFRAMES by numcep) containing features. Each row holds 1 feature vector.
+    """
+    return xfc((hz2hz, hz2hz), signal, samplerate, winlen, winstep, nfilt, nfft, lowfreq, highfreq, preemph,
+                winfunc, log)
+
+
+def bfc(signal, samplerate=16000, winlen=0.025, winstep=0.01, nfilt=26, nfft=512, lowfreq=0, highfreq=None,
+         preemph=0.97, winfunc=lambda x: numpy.ones((x,)), log=True):
+    """Compute Bark-scale features from an audio signal.
+
+    :param signal: the audio signal from which to compute features. Should be an N*1 array
+    :param samplerate: the samplerate of the signal we are working with.
+    :param winlen: the length of the analysis window in seconds. Default is 0.025s (25 milliseconds)
+    :param winstep: the step between successive windows in seconds. Default is 0.01s (10 milliseconds)
+    :param nfilt: the number of filters in the filterbank, default 26.
+    :param nfft: the FFT size. Default is 512.
+    :param lowfreq: lowest band edge of mel filters. In Hz, default is 0.
+    :param highfreq: highest band edge of mel filters. In Hz, default is samplerate/2
+    :param preemph: apply preemphasis filter with preemph as coefficient. 0 is no filter. Default is 0.97.
+                        energy.
+    :param winfunc: the analysis window to apply to each frame. By default no window is applied. You can use numpy
+                    window functions here e.g. winfunc=numpy.hamming
+    :param log: Whether to convert the result to logarithmic scale or not
+    :returns: A numpy array of size (NUMFRAMES by numcep) containing features. Each row holds 1 feature vector.
+    """
+    return xfc((hz2bark, bark2hz), signal, samplerate, winlen, winstep, nfilt, nfft, lowfreq, highfreq,
+                preemph, winfunc, log)
+
+
+def gfc(lowhear, hihear, signal, k=0.88, samplerate=16000, winlen=0.025, winstep=0.01, nfilt=26, nfft=512,
+         lowfreq=0, highfreq=None, preemph=0.97, winfunc=lambda x: numpy.ones((x,)), log=True):
+    """Compute Greenwood scale features from an audio signal, given the species' range of hearing
+
+    :param hihear: The upper frequency of the range of hearing of this species
+    :param lowhear: The lower frequency of the range of hearing of this species
+    :param k: The species specific balancing parameter
+    :param signal: the audio signal from which to compute features. Should be an N*1 array
+    :param samplerate: the samplerate of the signal we are working with.
+    :param winlen: the length of the analysis window in seconds. Default is 0.025s (25 milliseconds)
+    :param winstep: the step between successive windows in seconds. Default is 0.01s (10 milliseconds)
+    :param nfilt: the number of filters in the filterbank, default 26.
+    :param nfft: the FFT size. Default is 512.
+    :param lowfreq: lowest band edge of mel filters. In Hz, default is 0.
+    :param highfreq: highest band edge of mel filters. In Hz, default is samplerate/2
+    :param preemph: apply preemphasis filter with preemph as coefficient. 0 is no filter. Default is 0.97.
+                        energy.
+    :param winfunc: the analysis window to apply to each frame. By default no window is applied. You can use numpy
+                    window functions here e.g. winfunc=numpy.hamming
+    :param log: Whether to convert the result to logarithmic scale or not
+    :returns: A numpy array of size (NUMFRAMES by numcep) containing features. Each row holds 1 feature vector.
+    """
+
+    scaling = greenwood(lowhear, hihear, k)
+    return xfc(scaling, signal, samplerate, winlen, winstep, nfilt, nfft, lowfreq, highfreq, preemph, winfunc, log)
 
 
 def fbank(signal, samplerate=16000, winlen=0.025, winstep=0.01, nfilt=26, nfft=512, lowfreq=0, highfreq=None,
